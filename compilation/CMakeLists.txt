@@ -1,11 +1,10 @@
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1)
 project(
   NVVM2X86
   DESCRIPTION "Translate NVVM IR to LLVM IR for X86 backend"
   LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-
 # compile kernel translator
 include_directories(./KernelTranslation/include/x86)
 add_subdirectory(KernelTranslation)
@@ -21,3 +20,9 @@ add_executable(hostTranslator HostTranslation.cpp)
 
 target_link_libraries(hostTranslator spmd2mpmd cudaRuntime2cpuRuntime
                       ${GCC_COVERAGE_LINK_FLAGS})
+
+# compile JIT compiler
+include_directories(./KernelTranslation/include/x86)
+
+add_executable(jitCompiler JIT.cpp)
+target_link_libraries(jitCompiler spmd2mpmd ${GCC_COVERAGE_LINK_FLAGS})

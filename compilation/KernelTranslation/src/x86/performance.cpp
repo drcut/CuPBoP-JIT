@@ -1,5 +1,6 @@
 #include "performance.h"
 #include "debug.hpp"
+#include "init.h"
 #include "tool.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringRef.h"
@@ -52,6 +53,7 @@ void performance_optimization(llvm::Module *M) {
   }
   llvm::legacy::PassManager Passes;
 
+  init_llvm_pass();
   // add target machine info
   llvm::Triple triple("x86_64-unknown-linux-gnu");
 

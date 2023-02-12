@@ -50,9 +50,6 @@ int main(int argc, char **argv) {
   // Not only for x86 backend
   generate_x86_format(program);
 
-  // performance optimization
-  performance_optimization(program);
-
   VerifyModule(program);
 
   DumpModule(program, argv[2]);
