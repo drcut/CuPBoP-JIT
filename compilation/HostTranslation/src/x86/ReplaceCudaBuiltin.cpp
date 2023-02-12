@@ -54,13 +54,14 @@ void InsertSyncAfterKernelLaunch(llvm::Module *M) {
   }
 }
 
-// Change to i8* bitcast (i8* (i8*)* @_Z9vecPKiS0_Pii_wrapper to i8*)
+// pass the function name instead of function pointers, so that we can support
+// JIT Change to i8* bitcast (i8* (i8*)* @_Z9vecPKiS0_Pii_wrapper to i8*)
 // Original: i8* bitcast (void (i32*, i32*, i32*, i32)* @_Z9vecPKiS0_Pii to i8*)
 void ReplaceKernelLaunch(llvm::Module *M) {
   LLVMContext &context = M->getContext();
   auto VoidTy = llvm::Type::getVoidTy(context);
   auto I8 = llvm::Type::getInt8PtrTy(context);
-  std::map<std::string, Function *> kernels;
+  std::map<std::string, GlobalVariable *> kernels;
 
   std::set<llvm::Function *> need_remove;
   LLVMContext *C = &M->getContext();
@@ -148,7 +149,8 @@ void ReplaceKernelLaunch(llvm::Module *M) {
           if (Function *calledFunction = callInst->getCalledFunction()) {
 
             if (calledFunction->getName().startswith("cudaLaunchKernel")) {
-
+              // replace the first argument from the function pointer to the
+              // function name
               Value *callOperand = callInst->getArgOperand(0);
 
               Function *functionOperand =
@@ -167,11 +169,12 @@ void ReplaceKernelLaunch(llvm::Module *M) {
                            func_name.c_str(),
                            functionOperand->getName().str().c_str(),
                            functionOperand->arg_size());
-                auto rep = kernels.find(functionOperand->getName().str());
-                if (rep != kernels.end()) {
-                  Function *FC = rep->second;
-                  BitCastInst *B = new BitCastInst(FC, I8, "", callInst);
-                  callInst->setArgOperand(0, B);
+
+                if (kernels.find(functionOperand->getName().str()) !=
+                    kernels.end()) {
+                  auto v =
+                      kernels.find(functionOperand->getName().str())->second;
+                  callInst->setArgOperand(0, v);
                   continue;
                 }
 
@@ -208,15 +211,20 @@ void ReplaceKernelLaunch(llvm::Module *M) {
                   break;
                 }
                 DEBUG_INFO("Change Kernel Name to: %s\n", newName.c_str());
+                // generate a constant string
+                std::vector<llvm::Constant *> chars;
+                for (unsigned int i = 0; i < newName.size(); i++) {
+                  chars.push_back(ConstantInt::get(Int8T, newName[i]));
+                }
+                auto init = ConstantArray::get(
+                    ArrayType::get(Int8T, chars.size()), chars);
+                GlobalVariable *v =
+                    new GlobalVariable(*M, init->getType(), true,
+                                       GlobalVariable::ExternalLinkage, init);
+                // replace the first arguments by the new generated string
+                callInst->setArgOperand(0, ConstantExpr::getBitCast(v, I8));
 
-                Function *F =
-                    Function::Create(FT, Function::ExternalLinkage, newName, M);
-                F->setDSOLocal(true);
-                F->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
-
-                BitCastInst *BC = new BitCastInst(F, I8, "", callInst);
-                callInst->setArgOperand(0, BC);
-                kernels.insert({functionOperand->getName().str(), F});
+                kernels.insert({functionOperand->getName().str(), v});
               }
             } else if (cuda_register_kernel_names.find(
                            calledFunction->getName().str()) !=
