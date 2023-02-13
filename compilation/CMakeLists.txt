@@ -22,7 +22,7 @@ target_link_libraries(hostTranslator spmd2mpmd cudaRuntime2cpuRuntime
                       ${GCC_COVERAGE_LINK_FLAGS})
 
 # compile JIT compiler
+include_directories(../common)
 include_directories(./KernelTranslation/include/x86)
-
 add_executable(jitCompiler JIT.cpp)
 target_link_libraries(jitCompiler spmd2mpmd ${GCC_COVERAGE_LINK_FLAGS})
