@@ -20,20 +20,13 @@ void replace_global_variable(llvm::GlobalVariable *gv, llvm::Value *v) {
   std::vector<llvm::Value *> Users(gv->user_begin(), gv->user_end());
   for (auto *U : Users) {
     if (auto *loadInst = llvm::dyn_cast<llvm::LoadInst>(U)) {
-      printf("replace\n");
-      loadInst->dump();
-      v->dump();
       loadInst->replaceAllUsesWith(v);
-      printf("replace done\n");
     } else {
       // as we only replace block_size global variables, all users should be
       // loadInst
       exit(1);
     }
   }
-  printf("get here\n");
-  // gv->dropAllReferences();
-  // gv->removeFromParent();
 }
 
 struct ReplaceRuntimeConfiguration : public ModulePass {

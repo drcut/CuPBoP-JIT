@@ -3,13 +3,17 @@
 #include "cuda_runtime.h"
 #include "debug.hpp"
 #include "def.h"
+#include "exec.hpp"
 #include "macros.h"
 #include "structures.h"
+#include <dlfcn.h>
 #include <iostream>
+#include <sstream>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 cudaError_t cudaGetDevice(int *devPtr) {
   *devPtr = 0;
   return cudaSuccess;
@@ -44,9 +48,46 @@ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
       gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y, blockDim.z,
       sharedMem);
 
-  cu_kernel *ker =
-      create_kernel(func, gridDim, blockDim, args, sharedMem, stream);
+  // JIT
+  auto func_name = (char *)func;
+  printf("cudalaunchKernel: %s\n", func_name);
+  // search whether the shared libraries already been generated
+  std::stringstream ss;
+  ss << "find /tmp/cache/ -name ";
+  // ss << "*_Z21optimized_add_vectorsPdS_S__1_1_1*";
+  ss << "*" << func_name << "*" << '_' << gridDim.x << '_' << gridDim.y << '_'
+     << gridDim.z << '_' << blockDim.x << '_' << blockDim.y << '_' << blockDim.z
+     << ".so";
+  std::string search_regular_expr = ss.str();
+  std::string shared_library_path = exec(search_regular_expr.c_str());
 
+  if (strlen(shared_library_path.c_str()) == 0) {
+    // need to generate a shared library
+    // jitCompiler kernel.bc 64 1 1 1 1 1
+    ss = std::stringstream();
+    ss << "jitCompiler "
+       << "/tmp/cache/kernel.bc " << gridDim.x << ' ' << gridDim.y << ' '
+       << gridDim.z << ' ' << blockDim.x << ' ' << blockDim.y << ' '
+       << blockDim.z;
+    exec(ss.str().c_str());
+    shared_library_path = exec(search_regular_expr.c_str());
+  }
+  if (!shared_library_path.empty() &&
+      shared_library_path[shared_library_path.length() - 1] == '\n')
+    shared_library_path.erase(shared_library_path.length() - 1);
+  void *handle = dlopen(shared_library_path.c_str(), RTLD_LAZY);
+  if (!handle) {
+    printf("Error: %s", dlerror());
+    exit(1);
+  }
+  const void *jit_func = dlsym(handle, func_name);
+  if (!jit_func) {
+    printf("no jit func %s in library %s\n", func_name,
+           shared_library_path.c_str());
+    exit(1);
+  }
+  cu_kernel *ker =
+      create_kernel(jit_func, gridDim, blockDim, args, sharedMem, stream);
   int lstatus = cuLaunchKernel(&ker);
 
   return cudaSuccess;

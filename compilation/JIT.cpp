@@ -41,15 +41,16 @@ int main(int argc, char **argv) {
   DumpModule(program, "/tmp/cache/tmp.bc");
   // generate object file (.o)
   // object file name: kernel1_kernel2_..._block_x_bloxk_y_block_z.o
-  std::string object_file_name = "/tmp/cache/";
+  std::stringstream obj_ss;
+  obj_ss << "/tmp/cache/";
   for (Module::iterator i = program->begin(), e = program->end(); i != e; ++i) {
     Function *F = &(*i);
     if (isKernelFunction(program, F))
-      object_file_name += '_' + F->getName().str();
+      obj_ss << '_' << F->getName().str() << "_wrapper";
   }
-  object_file_name += '_' + std::to_string(block_x) + '_' +
-                      std::to_string(block_y) + '_' + std::to_string(block_z);
-  object_file_name += ".so";
+  obj_ss << '_' << grid_x << '_' << grid_y << '_' << grid_z << '_' << block_x
+         << '_' << block_y << '_' << block_z << ".so";
+  std::string object_file_name = obj_ss.str();
   printf("object_file_name: %s\n", object_file_name.c_str());
   // use clang to generate shared library
   std::stringstream ss;
