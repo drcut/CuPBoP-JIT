@@ -216,6 +216,7 @@ void ReplaceKernelLaunch(llvm::Module *M) {
                 for (unsigned int i = 0; i < newName.size(); i++) {
                   chars.push_back(ConstantInt::get(Int8T, newName[i]));
                 }
+                chars.push_back(ConstantInt::get(Int8T, '\0'));
                 auto init = ConstantArray::get(
                     ArrayType::get(Int8T, chars.size()), chars);
                 GlobalVariable *v =

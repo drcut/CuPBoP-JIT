@@ -8,6 +8,7 @@
 #include "structures.h"
 #include <dlfcn.h>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <stdint.h>
 #include <stdio.h>
@@ -39,7 +40,7 @@ cudaError_t cudaFreeHost(void *devPtr) {
   free(devPtr);
   return cudaSuccess;
 }
-
+std::map<char *, const void *> JIT_func_map;
 cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
                              void **args, size_t sharedMem,
                              cudaStream_t stream) {
@@ -51,6 +52,14 @@ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
   // JIT
   auto func_name = (char *)func;
   printf("cudalaunchKernel: %s\n", func_name);
+  auto iter = JIT_func_map.find(func_name);
+  if (iter != JIT_func_map.end()) {
+    printf("find in cache\n");
+    cu_kernel *ker =
+        create_kernel(iter->second, gridDim, blockDim, args, sharedMem, stream);
+    int lstatus = cuLaunchKernel(&ker);
+    return cudaSuccess;
+  }
   // search whether the shared libraries already been generated
   std::stringstream ss;
   ss << "find /tmp/cache/ -name ";
@@ -70,6 +79,7 @@ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
        << gridDim.z << ' ' << blockDim.x << ' ' << blockDim.y << ' '
        << blockDim.z;
     exec(ss.str().c_str());
+    printf("%s\n", ss.str().c_str());
     shared_library_path = exec(search_regular_expr.c_str());
   }
   if (!shared_library_path.empty() &&
@@ -86,6 +96,7 @@ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
            shared_library_path.c_str());
     exit(1);
   }
+  JIT_func_map.insert(std::pair<char *, const void *>(func_name, jit_func));
   cu_kernel *ker =
       create_kernel(jit_func, gridDim, blockDim, args, sharedMem, stream);
   int lstatus = cuLaunchKernel(&ker);

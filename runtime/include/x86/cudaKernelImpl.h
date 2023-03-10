@@ -23,6 +23,8 @@ double __nv_fmind(double, double);
 double __nv_fmaxd(double, double);
 int __nvvm_mul24_i(int, int);
 double _ZL3expd(double);
+float _ZL3logf(float);
+float _ZL4sqrtf(float);
 double _ZL8copysigndd(double, double);
 }
 #endif

@@ -3,6 +3,8 @@
 double __nv_exp(double base) { return exp(base); }
 double __nv_sqrt(double v) { return sqrt(v); }
 float __nv_sqrtf(float v) { return sqrt(v); }
+float _ZL3logf(float v) { return logf(v); }
+float _ZL4sqrtf(float v) { return sqrt(v); }
 float __nv_powif(float base, int exp) { return pow(base, exp); }
 float __nv_logf(float v) { return logf(v); }
 float __nv_expf(float v) { return expf(v); }

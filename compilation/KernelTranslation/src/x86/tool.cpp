@@ -492,6 +492,7 @@ void replace_built_in_function(llvm::Module *M) {
                        func_name == "__nv_sqrtf" || func_name == "__nv_exp" ||
                        func_name == "__nv_isnanf" ||
                        func_name == "__nv_isinff" || func_name == "__nv_powi" ||
+                       func_name == "_ZL4sqrtf" || func_name == "_ZL3logf" ||
                        func_name == "__nv_powif") {
               Call->getCalledFunction()->deleteBody();
             } else if (func_name == "llvm.nvvm.fma.rn.d") {

@@ -54,9 +54,10 @@ int main(int argc, char **argv) {
   printf("object_file_name: %s\n", object_file_name.c_str());
   // use clang to generate shared library
   std::stringstream ss;
-  ss << "clang -shared "
+  ss << "clang -O3 -shared "
      << "/tmp/cache/tmp.bc"
      << " -o " << object_file_name;
   exec(ss.str().c_str());
+  printf("%s\n", ss.str().c_str());
   return 0;
 }
