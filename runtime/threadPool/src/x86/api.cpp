@@ -8,28 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <thread>
-
-/*
-Initialize the device
-*/
-int device_max_compute_units = 1;
-bool device_initilized = false;
-int init_device() {
-  if (device_initilized)
-    return C_SUCCESS;
-  device_initilized = true;
-  cu_device *device = (cu_device *)calloc(1, sizeof(cu_device));
-  if (device == NULL)
-    return C_ERROR_MEMALLOC;
-
-  device->max_compute_units = std::thread::hardware_concurrency();
-  DEBUG_INFO("%d concurrent threads are supported.\n",
-             device->max_compute_units);
-  device_max_compute_units = device->max_compute_units;
-
-  // initialize scheduler
-  return scheduler_init(*device);
-}
+#include <omp.h>
 
 // Create Kernel
 static int kernelIds = 0;
@@ -70,45 +49,42 @@ __thread int warp_shfl[32] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
+int** global_dynamic_shared_memory;
 
-/*
-    Enqueue Kernel (k) to the scheduler kernelQueue
-*/
-int TaskToExecute;
-int schedulerEnqueueKernel(cu_kernel *k) {
-  int totalBlocks =
-      k->totalBlocks; // calculate gpu_block_to_execute_per_cpu_thread
-  int gpuBlockToExecutePerCpuThread =
-      (totalBlocks + device_max_compute_units - 1) / device_max_compute_units;
-  TaskToExecute = (totalBlocks + gpuBlockToExecutePerCpuThread - 1) /
-                  gpuBlockToExecutePerCpuThread;
-  for (int startBlockIdx = 0; startBlockIdx < totalBlocks;
-       startBlockIdx += gpuBlockToExecutePerCpuThread) {
-    cu_kernel *p = new cu_kernel(*k);
-    p->startBlockId = startBlockIdx;
-    p->endBlockId = std::min(startBlockIdx + gpuBlockToExecutePerCpuThread - 1,
-                             totalBlocks - 1);
-    scheduler->kernelQueue->enqueue(p);
-  }
-  return C_SUCCESS;
-}
 
 /*
   Kernel Launch with numBlocks and numThreadsPerBlock
 */
 int cuLaunchKernel(cu_kernel **k) {
-  if (!device_initilized) {
-    init_device();
-  }
   // Calculate Block Size N/numBlocks
   cu_kernel *ker = *k;
-  int status = C_RUN;
-  // set complete to false, this variable is used for sync
-  for (int i = 0; i < scheduler->num_worker_threads; i++) {
-    scheduler->thread_pool[i].completeTask = 0;
-  }
-  schedulerEnqueueKernel(ker);
 
+  int dynamic_shared_mem_size = ker->shared_mem;
+  dim3 gridDim= ker->gridDim;
+  dim3 blockDim= ker->blockDim;
+  
+  #pragma omp parallel for schedule(static)
+  for(int block_index = 0; block_index < ker->totalBlocks; block_index++)
+  {
+      block_size = ker->blockSize;
+      block_size_x = blockDim.x;
+      block_size_y = blockDim.y;
+      block_size_z = blockDim.z;
+      grid_size_x = gridDim.x;
+      grid_size_y = gridDim.y;
+      grid_size_z = gridDim.z;
+
+      if (dynamic_shared_mem_size > 0) {
+        dynamic_shared_memory = (int *)malloc(dynamic_shared_mem_size);
+      }
+      int tmp = block_index;
+      block_index_x = tmp / (grid_size_y * grid_size_z);
+      tmp = tmp % (grid_size_y * grid_size_z);
+      block_index_y = tmp / (grid_size_z);
+      tmp = tmp % (grid_size_z);
+      block_index_z = tmp;
+      ker->start_routine(ker->args);
+  }
   return 0;
 }
 
@@ -176,47 +152,11 @@ void *driver_thread(void *p) {
   }
 }
 
-/*
-Initialize the scheduler
-*/
-int scheduler_init(cu_device device) {
-  scheduler = (cu_pool *)calloc(1, sizeof(cu_pool));
-  scheduler->num_worker_threads = device.max_compute_units;
-  scheduler->num_kernel_queued = 0;
-
-  scheduler->thread_pool = (struct c_thread *)calloc(
-      scheduler->num_worker_threads, sizeof(c_thread));
-  scheduler->kernelQueue = new kernel_queue;
-
-  scheduler->idle_threads = 0;
-  for (int i = 0; i < scheduler->num_worker_threads; i++) {
-    scheduler->thread_pool[i].index = i;
-    pthread_create(&scheduler->thread_pool[i].thread, NULL, driver_thread,
-                   (void *)&scheduler->thread_pool[i]);
-  }
-
-  return C_SUCCESS;
-}
-
 void scheduler_uninit() { assert(0 && "Scheduler Unitit no Implemente\n"); }
 
 /*
   Barrier for Kernel Launch
 */
 void cuSynchronizeBarrier() {
-  if (!device_initilized) {
-    init_device();
-  }
-  while (1) {
-    // after compilation transformation, each kernel launch has a
-    // following sync
-    if (scheduler->kernelQueue->size_approx() == 0) {
-      int completeBlock = 0;
-      for (int i = 0; i < scheduler->num_worker_threads; i++) {
-        completeBlock += (scheduler->thread_pool[i].completeTask);
-      }
-      if (completeBlock == TaskToExecute)
-        break;
-    }
-  }
+  return;
 }

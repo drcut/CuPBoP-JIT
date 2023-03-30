@@ -87,7 +87,6 @@ cudaError_t cudaMemcpyToSymbol_host(void *dst, const void *src, size_t count,
 }
 
 cudaError_t cudaSetDevice(int device) {
-  init_device();
   return cudaSuccess;
 }
 

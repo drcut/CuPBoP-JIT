@@ -45,7 +45,7 @@ if(DEBUG)
 endif()
 
 set(CMAKE_CXX_FLAGS
-    "-I${CUDA_PATH}/include ${LLVM_CXX_FLAG} ${CMAKE_CXX_FLAGS}")
+    "-fopenmp -I${CUDA_PATH}/include ${LLVM_CXX_FLAG} ${CMAKE_CXX_FLAGS}")
 
 set(GCC_COVERAGE_LINK_FLAGS
     "-L${LLVM_LIB_PATH} ${LLVM_LINK_FLAG} -lz -lrt -ldl -ltinfo -lpthread -lm")
