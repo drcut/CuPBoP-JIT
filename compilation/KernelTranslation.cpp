@@ -1,3 +1,4 @@
+#include "anti_coalescing.h"
 #include "generate_cpu_format.h"
 #include "handle_sync.h"
 #include "init.h"
@@ -32,6 +33,9 @@ int main(int argc, char **argv) {
 
   // replace warp shuffle
   handle_warp_shfl(program);
+
+  // anti-coalescing transformation
+  anti_global_mem_coalescing_optimization(program);
 
   // insert sync
   insert_sync(program);
