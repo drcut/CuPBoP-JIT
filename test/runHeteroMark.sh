@@ -23,7 +23,7 @@ clang++ -std=c++11 $HeteroMark_PATH/src/$1/cuda/$1_cuda_benchmark.cu -I$HeteroMa
         -lcudart_static -ldl -lrt -pthread -save-temps -v  || true
 export LD_LIBRARY_PATH=$CuPBoP_BUILD_PATH/runtime:$CuPBoP_BUILD_PATH/runtime/threadPool:$LD_LIBRARY_PATH
 export PATH=$CuPBoP_BUILD_PATH/compilation:$PATH
-kernelTranslator $1_cuda_benchmark-cuda-nvptx64-nvidia-cuda-sm_50.bc kernel.bc
+kernelTranslator $1_cuda_benchmark-cuda-nvptx64-nvidia-cuda-sm_50.bc $1_cuda_benchmark-host-x86_64-unknown-linux-gnu.bc kernel.bc
 hostTranslator $1_cuda_benchmark-host-x86_64-unknown-linux-gnu.bc host.bc
 llc --relocation-model=pic --filetype=obj  kernel.bc
 llc --relocation-model=pic --filetype=obj  host.bc

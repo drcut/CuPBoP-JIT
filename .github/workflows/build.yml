@@ -69,10 +69,10 @@ jobs:
           llc --relocation-model=pic --filetype=obj  host.bc
           g++ -o reverse -fPIC -no-pie -L${{ github.workspace }}/build/runtime   -L${{ github.workspace }}/build/runtime/threadPool   host.o kernel.o -lc -lCPUruntime -lthreadPool -lpthread
           ./reverse
-      # - name: Execute Hetero-mark benchmark
-      #   run: |
-      #     cd ${{ github.workspace }}/build
-      #     make CTEST_OUTPUT_ON_FAILURE=1 test
+      - name: Execute Hetero-mark benchmark
+        run: |
+          cd ${{ github.workspace }}/build
+          make CTEST_OUTPUT_ON_FAILURE=1 test
       # - name: Execute the lavaMD example
       #   run: |
       #     cd ${{ github.workspace }}
