@@ -2,6 +2,8 @@
 #include "debug.hpp"
 #include "tool.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
 
 using namespace llvm;
 
@@ -14,7 +16,21 @@ void set_meta_data(llvm::Module *M) {
 
 // as pthread only accept a single void* for input
 // we have to decode this input inside the kernel
-void decode_input(llvm::Module *M) {
+void generate_kernel_launch_wrapper(llvm::Module *M,
+                                    llvm::Module *host_module) {
+
+  // This is part of block-size invariant analysis.
+  // We scan the host module to get all possible block sizes.
+  std::set<Dim3SizeConfig> possible_block_size_list =
+      get_possible_grid_or_block_size(host_module, /*getBlockSize=*/true);
+  if (possible_block_size_list.size() != 0) {
+    printf("possible block sizes: \n");
+    for (auto block_size : possible_block_size_list) {
+      printf("x: %d y: %d z: %d\n", block_size._x, block_size._y,
+             block_size._z);
+    }
+    printf("\n");
+  }
 
   std::set<llvm::Function *> need_remove;
 
@@ -75,8 +91,65 @@ void decode_input(llvm::Module *M) {
       Arguments.push_back(Arg);
       ++idx;
     }
-    Builder.CreateCall(F, ArrayRef<llvm::Value *>(Arguments));
-    Builder.CreateRetVoid();
+    BasicBlock *exit_block = BasicBlock::Create(M->getContext(), "", WorkGroup);
+    {
+      llvm::IRBuilder<> Builder3(M->getContext());
+      Builder3.SetInsertPoint(exit_block);
+      Builder3.CreateRetVoid();
+    }
+    auto block_size_global = M->getGlobalVariable("block_size");
+    auto loaded_block_size = Builder.CreateLoad(
+        block_size_global->getType()->getElementType(), block_size_global);
+    BasicBlock *default_call_block =
+        BasicBlock::Create(M->getContext(), "default_block_size", WorkGroup);
+    auto default_call_inst = llvm::CallInst::Create(
+        F, ArrayRef<llvm::Value *>(Arguments), "", default_call_block);
+    llvm::BranchInst::Create(exit_block, default_call_block);
+    auto switchInst =
+        Builder.CreateSwitch(loaded_block_size, default_call_block);
+
+    for (auto block_size_config : possible_block_size_list) {
+      // Clone a new function
+      ValueToValueMapTy EmptyMap;
+      Function *Clone = CloneFunction(F, EmptyMap);
+      Clone->setName(F->getName() + "_block_size_" +
+                     block_size_config.toString());
+      // replace all reference to block_size to constants
+      auto replace_global_variable_with_constant =
+          [&](llvm::GlobalVariable *global_variable, int constant) {
+            ConstantInt *constant_int =
+                dyn_cast<ConstantInt>(ConstantInt::get(Int32T, constant, true));
+            std::vector<llvm::Value *> Users(global_variable->user_begin(),
+                                             global_variable->user_end());
+            for (auto *U : Users) {
+              if (auto *loadInst = llvm::dyn_cast<llvm::LoadInst>(U))
+                if (loadInst->getParent()->getParent() == Clone) {
+                  loadInst->replaceAllUsesWith(constant_int);
+                }
+            }
+          };
+
+      int total_block_size =
+          block_size_config._x * block_size_config._y * block_size_config._z;
+      replace_global_variable_with_constant(M->getGlobalVariable("block_size"),
+                                            total_block_size);
+      replace_global_variable_with_constant(
+          M->getGlobalVariable("block_size_x"), block_size_config._x);
+      replace_global_variable_with_constant(
+          M->getGlobalVariable("block_size_y"), block_size_config._y);
+      replace_global_variable_with_constant(
+          M->getGlobalVariable("block_size_z"), block_size_config._z);
+      BasicBlock *possible_call_block = BasicBlock::Create(
+          M->getContext(), "block_size_" + block_size_config.toString(),
+          WorkGroup);
+      auto call_inst = llvm::CallInst::Create(
+          Clone, ArrayRef<llvm::Value *>(Arguments), "", possible_call_block);
+      auto branch_inst =
+          llvm::BranchInst::Create(exit_block, possible_call_block);
+      switchInst->addCase(dyn_cast<ConstantInt>(
+                              ConstantInt::get(Int32T, total_block_size, true)),
+                          possible_call_block);
+    }
   }
   for (auto f : need_remove) {
     f->dropAllReferences();
@@ -112,14 +185,14 @@ void remove_useless_var(llvm::Module *M) {
   M->getGlobalVariable("inter_warp_index")->eraseFromParent();
 }
 
-void generate_cpu_format(llvm::Module *M) {
+void generate_cpu_format(llvm::Module *kernel, llvm::Module *host) {
   DEBUG_INFO("generate cpu format\n");
   // change metadata
-  set_meta_data(M);
+  set_meta_data(kernel);
   // decode argument
-  decode_input(M);
+  generate_kernel_launch_wrapper(kernel, host);
   // remove barrier
-  remove_barrier(M);
+  remove_barrier(kernel);
   // remove useless func/variable
-  remove_useless_var(M);
+  remove_useless_var(kernel);
 }

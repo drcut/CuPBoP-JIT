@@ -18,47 +18,49 @@ using namespace llvm;
 std::string PATH = "kernel_meta.log";
 
 int main(int argc, char **argv) {
-  assert(argc == 3 && "incorrect number of arguments\n");
-  llvm::Module *program = LoadModuleFromFilr(argv[1]);
+  assert(argc == 4 && "incorrect number of arguments\n");
+  llvm::Module *kernel_program = LoadModuleFromFilr(argv[1]);
+  llvm::Module *host_program = LoadModuleFromFilr(argv[2]);
+  char *output_path = argv[3];
 
   std::ofstream fout;
   fout.open(PATH);
 
   // inline __device__ functions, and create auxiliary global variables
-  init_block(program, fout);
+  init_block(kernel_program, fout);
 
   // insert sync before each vote, and replace the
   // original vote function to warp vote
-  handle_warp_vote(program);
+  handle_warp_vote(kernel_program);
 
   // replace warp shuffle
-  handle_warp_shfl(program);
+  handle_warp_shfl(kernel_program);
 
   // anti-coalescing transformation
-  anti_global_mem_coalescing_optimization(program);
+  anti_global_mem_coalescing_optimization(kernel_program);
 
   // insert sync
-  insert_sync(program);
+  insert_sync(kernel_program);
 
   // split block by sync
-  split_block_by_sync(program);
+  split_block_by_sync(kernel_program);
 
   // add loop for intra&intera thread, it refers 'hierarchical collapsing' in
   // COX paper.
-  insert_warp_loop(program);
+  insert_warp_loop(kernel_program);
 
-  replace_built_in_function(program);
+  replace_built_in_function(kernel_program);
 
   // the input kernel programs have NVIDIA metadata, they need to be replaced to
   // CPU metadata
-  generate_cpu_format(program);
+  generate_cpu_format(kernel_program, host_program);
 
   // execute O3 pipeline on the transformed program
-  performance_optimization(program);
+  performance_optimization(kernel_program);
 
-  VerifyModule(program);
+  VerifyModule(kernel_program);
 
-  DumpModule(program, argv[2]);
+  DumpModule(kernel_program, output_path);
 
   fout.close();
   return 0;

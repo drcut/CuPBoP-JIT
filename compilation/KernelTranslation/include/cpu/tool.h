@@ -4,6 +4,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include <sstream>
 
 llvm::Module *LoadModuleFromFilr(char *file_name);
 void DumpModule(llvm::Module *M, char *file_name);
@@ -31,4 +32,31 @@ llvm::Value *createInBoundsGEP(llvm::IRBuilder<> &B, llvm::Value *ptr,
                                llvm::ArrayRef<llvm::Value *> idxlist);
 llvm::Value *createGEP(llvm::IRBuilder<> &B, llvm::Value *ptr,
                        llvm::ArrayRef<llvm::Value *> idxlist);
+
+// Used to represent the CUDA grid/block size configuration
+struct Dim3SizeConfig {
+  int _x, _y, _z;
+  Dim3SizeConfig(int x, int y, int z) : _x(x), _y(y), _z(z) {}
+  // This function is used to convert the block size configuration to a
+  // string.
+  std::string toString() const {
+    std::ostringstream oss;
+    oss << _x << "_" << _y << "_" << _z;
+    return oss.str();
+  }
+  bool operator==(const Dim3SizeConfig &other) const {
+    return (_x == other._x && _y == other._y && _z == other._z);
+  }
+  bool operator<(const Dim3SizeConfig &other) const {
+    if (_x != other._x)
+      return _x < other._x;
+    if (_y != other._y)
+      return _y < other._y;
+    return _z < other._z;
+  }
+};
+
+std::set<Dim3SizeConfig>
+get_possible_grid_or_block_size(llvm::Module *host_module, bool getBlockSize);
+
 #endif
