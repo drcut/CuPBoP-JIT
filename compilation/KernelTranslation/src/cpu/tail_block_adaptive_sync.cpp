@@ -153,7 +153,7 @@ public:
       return 0;
     // Check whether the function body can be optimized.
     if (!isSingleConditionFormat(&F)) {
-      printf("the function does not contain tail block\n");
+      // The function does not contain tail block
       return 0;
     }
     // Check whether the condition is true for all but the last blocks.
@@ -169,10 +169,10 @@ public:
       printf("Condition is not always true.\n");
       return 0;
     } else {
-      printf("Condition is always true with threshold %d\n",
-             tail_block_threshold);
-      printf("And global index ranges: [0, %d)\n",
-             MulRange.getUnsignedMax().getZExtValue());
+      printf("Condition is always true (without tail block) with threshold %d "
+             "and global index "
+             "ranges: [0, %d)\n",
+             tail_block_threshold, MulRange.getUnsignedMax().getZExtValue());
     }
     printf("The function can be optimized by tail block adaptive sync\n");
     // Apply transformation

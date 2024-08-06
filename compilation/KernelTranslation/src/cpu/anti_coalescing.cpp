@@ -78,11 +78,8 @@ bool linear_related(llvm::Instruction *src, llvm::Instruction *des) {
  * threadIdx and the index is the -1 dimension;
  */
 bool loop_contains_global_memory_coalescing(llvm::Loop *L) {
-  printf("check loop with header: %s\n",
-         L->getHeader()->getName().str().c_str());
-  // find iteration variable
+  // Find iteration variable
   auto loop_latch = L->getLoopLatch();
-  auto F = loop_latch->getParent();
   if (!loop_latch) {
     return false;
   }
@@ -109,7 +106,6 @@ bool loop_contains_global_memory_coalescing(llvm::Loop *L) {
   std::set<llvm::Instruction *> visited;
   if (!linear_with_blockDim(inc_inst, visited)) {
     // the stride is not linear with blockDim
-    printf("not linear with block\n");
     return false;
   }
   // check whether the loop contains GEP insturction, with iteration_var as the
@@ -122,6 +118,7 @@ bool loop_contains_global_memory_coalescing(llvm::Loop *L) {
         if (auto last_dim_var = dyn_cast<llvm::Instruction>(last_dim)) {
           if (linear_related(iteration_var, last_dim_var)) {
             printf("Find global memory coalescing\n");
+            L->print(llvm::errs());
             return true;
           }
         }
@@ -186,7 +183,6 @@ public:
     // implement transformation
     for (auto L : mem_coalescing_loop) {
       LLVMContext &context = M->getContext();
-      auto I8Ptr = llvm::Type::getInt8PtrTy(context);
       auto I8 = llvm::Type::getInt8Ty(context);
       IRBuilder<> builder(context);
       // create basic blocks
