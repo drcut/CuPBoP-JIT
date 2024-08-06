@@ -31,9 +31,6 @@
 *.out
 *.app
 
-# LLVM files
-*.bc
-
 # CMake temp files
 Makefile
 CMakeCache.txt
