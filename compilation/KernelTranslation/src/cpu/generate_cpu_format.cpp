@@ -18,7 +18,6 @@ void set_meta_data(llvm::Module *M) {
 // we have to decode this input inside the kernel
 void generate_kernel_launch_wrapper(llvm::Module *M,
                                     llvm::Module *host_module) {
-
   // This is part of block-size invariant analysis.
   // We scan the host module to get all possible block sizes.
   std::set<Dim3SizeConfig> possible_block_size_list =

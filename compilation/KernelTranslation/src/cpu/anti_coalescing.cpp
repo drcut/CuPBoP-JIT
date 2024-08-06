@@ -181,8 +181,9 @@ public:
         continue;
       mem_coalescing_loop.insert(L);
     }
+    if (mem_coalescing_loop.size() == 0)
+      return 0;
     // implement transformation
-    printf("implement transformation\n");
     for (auto L : mem_coalescing_loop) {
       LLVMContext &context = M->getContext();
       auto I8Ptr = llvm::Type::getInt8PtrTy(context);
@@ -276,7 +277,6 @@ public:
       // do_while_header
       DeleteDeadBlocks(loop_cond);
     }
-    printf("finish transformation\n");
     return 1;
   }
 };

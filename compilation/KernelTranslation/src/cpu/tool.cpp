@@ -753,9 +753,10 @@ get_possible_grid_or_block_size(llvm::Module *host_module, bool getBlockSize) {
     for (auto &BB : F) {
       for (auto &I : BB) {
         if (auto *CI = dyn_cast<CallInst>(&I)) {
-          if (CI->getCalledFunction()->getName().str() ==
-              "__cudaPushCallConfiguration") {
-            auto dim3_size_initialization =
+          if (CI->getCalledFunction() &&
+              CI->getCalledFunction()->getName().str() ==
+                  "__cudaPushCallConfiguration") {
+            llvm::CallInst *dim3_size_initialization =
                 findDim3SizeForKernelLaunch(CI, getBlockSize);
 
             if (dim3_size_initialization) {
