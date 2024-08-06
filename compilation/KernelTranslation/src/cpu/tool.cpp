@@ -780,3 +780,51 @@ get_possible_grid_or_block_size(llvm::Module *host_module, bool getBlockSize) {
   }
   return possible_size_set;
 }
+
+Instruction *find_thread_idx_x(BasicBlock *BB) {
+  for (auto &I : *BB) {
+    if (auto *CI = dyn_cast<CallInst>(&I)) {
+      if (CI->getCalledFunction()->getName() ==
+          "llvm.nvvm.read.ptx.sreg.tid.x") {
+        return CI;
+      }
+    }
+  }
+  return nullptr;
+}
+Instruction *find_block_idx_x(BasicBlock *BB) {
+  for (auto &I : *BB) {
+    if (auto *CI = dyn_cast<CallInst>(&I)) {
+      if (CI->getCalledFunction()->getName() ==
+          "llvm.nvvm.read.ptx.sreg.ctaid.x") {
+        return CI;
+      }
+    }
+  }
+  return nullptr;
+}
+
+Instruction *find_block_dim_x(BasicBlock *BB) {
+  for (auto &I : *BB) {
+    if (auto *CI = dyn_cast<CallInst>(&I)) {
+      if (CI->getCalledFunction()->getName() ==
+          "llvm.nvvm.read.ptx.sreg.ntid.x") {
+        return CI;
+      }
+    }
+  }
+
+  return nullptr;
+}
+
+Instruction *find_grid_dim_x(BasicBlock *BB) {
+  for (auto &I : *BB) {
+    if (auto *CI = dyn_cast<CallInst>(&I)) {
+      if (CI->getCalledFunction()->getName() ==
+          "llvm.nvvm.read.ptx.sreg.nctaid.x") {
+        return CI;
+      }
+    }
+  }
+  return nullptr;
+}

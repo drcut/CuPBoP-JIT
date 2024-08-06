@@ -5,6 +5,7 @@
 #include "insert_sync.h"
 #include "insert_warp_loop.h"
 #include "performance.h"
+#include "tail_block_adaptive_sync.h"
 #include "tool.h"
 #include "warp_func.h"
 #include <assert.h>
@@ -28,6 +29,9 @@ int main(int argc, char **argv) {
 
   // inline __device__ functions, and create auxiliary global variables
   init_block(kernel_program, fout);
+
+  // Apply tail block adaptive synchronization transformation
+  tail_block_adaptive_sync_optimization(kernel_program, host_program);
 
   // insert sync before each vote, and replace the
   // original vote function to warp vote

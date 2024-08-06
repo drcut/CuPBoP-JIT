@@ -59,4 +59,9 @@ struct Dim3SizeConfig {
 std::set<Dim3SizeConfig>
 get_possible_grid_or_block_size(llvm::Module *host_module, bool getBlockSize);
 
+llvm::Instruction *find_thread_idx_x(llvm::BasicBlock *BB);
+llvm::Instruction *find_block_idx_x(llvm::BasicBlock *BB);
+llvm::Instruction *find_block_dim_x(llvm::BasicBlock *BB);
+llvm::Instruction *find_grid_dim_x(llvm::BasicBlock *BB);
+
 #endif
