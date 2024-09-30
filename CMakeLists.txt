@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 project(CuPBoP)
 set(CMAKE_PROJECT_DESCRIPTION "Executing CUDA on non-NVIDIA architecture.")
-set(CMAKE_CXX_STANDARD "14")
+set(CMAKE_CXX_STANDARD 17)
 
 find_program(LLVM_CONFIG llvm-config)
 if(NOT LLVM_CONFIG)

@@ -10,7 +10,6 @@ project(
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(LIB_NAME cudaRuntime2cpuRuntime)
 
-set(CMAKE_CXX_STANDARD 14)
 include_directories(./include/cpu)
 include_directories(../../common)
 
