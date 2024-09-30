@@ -1,8 +1,8 @@
 #include "generate_cpu_format.h"
 #include "debug.hpp"
 #include "tool.h"
-#include "llvm/Support/Host.h"
-
+#include "llvm/TargetParser/Host.h"
+#include <set>
 using namespace llvm;
 
 // set TargetTriple and DataLayout same as the host CPU

@@ -4,10 +4,12 @@
 #include "handle_sync.h"
 #include "tool.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopPass.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include <queue>
+#include <set>
 
 using namespace llvm;
 

@@ -183,7 +183,6 @@ void init_llvm_pass() {
   initializeAnalysis(Registry);
   initializeTransformUtils(Registry);
   initializeInstCombine(Registry);
-  initializeInstrumentation(Registry);
   initializeTarget(Registry);
 }
 

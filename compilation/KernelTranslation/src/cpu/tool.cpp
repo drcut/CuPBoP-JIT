@@ -2,6 +2,7 @@
 #include "debug.hpp"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/FileSystem.h"
