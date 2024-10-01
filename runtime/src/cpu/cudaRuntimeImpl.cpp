@@ -43,11 +43,6 @@ cudaError_t cudaFreeHost(void *devPtr) {
 cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
                              void **args, size_t sharedMem,
                              cudaStream_t stream) {
-  DEBUG_INFO(
-      "cudaLaunchKernel : Grid: x:%d y:%d z:%d Block: %d, %d, %d ShMem: %d\n",
-      gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y, blockDim.z,
-      sharedMem);
-
   cu_kernel *ker =
       create_kernel(func, gridDim, blockDim, args, sharedMem, stream);
 
@@ -182,11 +177,6 @@ extern cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim,
                                                         dim3 *blockDim,
                                                         size_t *sharedMem,
                                                         void **stream) {
-  DEBUG_INFO("__cudaPopCallConfiguration: Grid: x:%d y:%d z:%d Block: %d, %d, "
-             "%d ShMem: %lu\n",
-             gridDim->x, gridDim->y, gridDim->z, blockDim->x, blockDim->y,
-             blockDim->z, *sharedMem);
-
   *gridDim = callParamTemp.gridDim;
   *blockDim = callParamTemp.blockDim;
   *sharedMem = callParamTemp.shareMem;
@@ -197,16 +187,11 @@ extern cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim,
 
 extern __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(
     dim3 gridDim, dim3 blockDim, size_t sharedMem = 0, void *stream = 0) {
-  DEBUG_INFO("__cudaPushCallConfiguration: Grid: x:%d y:%d z:%d Block: %d, %d, "
-             "%d ShMem: %lu\n",
-             gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y,
-             blockDim.z, sharedMem);
-
   // memory checks allocations
   callParamTemp.gridDim = gridDim;
   callParamTemp.blockDim = blockDim;
   callParamTemp.shareMem = sharedMem;
-  (callParamTemp.stream) = stream;
+  callParamTemp.stream = stream;
   return cudaSuccess;
 }
 }

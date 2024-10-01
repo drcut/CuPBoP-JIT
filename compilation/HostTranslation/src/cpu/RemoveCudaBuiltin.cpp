@@ -3,6 +3,7 @@
  */
 #include "RemoveCudaBuiltin.h"
 #include "debug.hpp"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include <set>
@@ -55,12 +56,10 @@ void RemoveCudaBuiltin(llvm::Module *M) {
       } else {
         // Create the new global and insert it next to the existing list.
         GlobalVariable *NGV = new GlobalVariable(
-            CA->getType(), GV->isConstant(), GV->getLinkage(), CA, "",
+            *M, CA->getType(), GV->isConstant(), GV->getLinkage(), CA, "", GV,
             GV->getThreadLocalMode());
-        GV->getParent()->getGlobalList().insert(GV->getIterator(), NGV);
         NGV->takeName(GV);
 
-        // Nuke the old list, replacing any uses with the new one.
         if (!GV->use_empty()) {
           Constant *V = NGV;
           if (V->getType() != GV->getType())

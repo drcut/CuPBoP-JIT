@@ -1,3 +1,4 @@
+#include "debug.hpp"
 #include "generate_cpu_format.h"
 #include "handle_sync.h"
 #include "init.h"
@@ -23,33 +24,49 @@ int main(int argc, char **argv) {
   std::ofstream fout;
   fout.open(PATH);
 
+  DEBUG_INFO("CuPBoP pass: init_block\n");
   // inline __device__ functions, and create auxiliary global variables
   init_block(program, fout);
+  VerifyModule(program);
 
   // insert sync before each vote, and replace the
   // original vote function to warp vote
+  DEBUG_INFO("CuPBoP pass: handle warp vote\n");
   handle_warp_vote(program);
+  VerifyModule(program);
 
   // replace warp shuffle
+  DEBUG_INFO("CuPBoP pass: handle warp shuffle\n");
   handle_warp_shfl(program);
+  VerifyModule(program);
 
   // insert sync
+  DEBUG_INFO("CuPBoP pass: insert barrier\n");
   insert_sync(program);
+  VerifyModule(program);
 
   // split block by sync
+  DEBUG_INFO("CuPBoP pass: split block by sync\n");
   split_block_by_sync(program);
+  VerifyModule(program);
 
   // add loop for intra&intera thread, it refers 'hierarchical collapsing' in
   // COX paper.
+  DEBUG_INFO("CuPBoP pass: insert warp loop\n");
   insert_warp_loop(program);
+  VerifyModule(program);
 
+  DEBUG_INFO("CuPBoP pass: replace built-in function\n");
   replace_built_in_function(program);
+  VerifyModule(program);
 
   // the input kernel programs have NVIDIA metadata, they need to be replaced to
   // CPU metadata
+  DEBUG_INFO("CuPBoP pass: generate cpu format\n");
   generate_cpu_format(program);
+  VerifyModule(program);
 
-  // execute O3 pipeline on the transformed program
+  DEBUG_INFO("CuPBoP pass: performance optimization\n");
   performance_optimization(program);
 
   VerifyModule(program);

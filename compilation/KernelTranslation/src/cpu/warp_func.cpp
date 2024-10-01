@@ -59,15 +59,13 @@ void handle_warp_vote(llvm::Module *M) {
     assert(warp_vote_ptr != NULL);
     auto intra_warp_index_addr = M->getGlobalVariable("intra_warp_index");
     auto intra_warp_index =
-        new LoadInst(intra_warp_index_addr->getType()->getPointerElementType(),
+        new LoadInst(intra_warp_index_addr->getValueType(),
                      intra_warp_index_addr, "intra_warp_index", sync_inst);
 
-    auto GEP = GetElementPtrInst::Create(
-        cast<PointerType>(warp_vote_ptr->getType()->getScalarType())
-            ->getElementType(),
-        warp_vote_ptr,            // Alloca
-        {zero, intra_warp_index}, // Indices
-        "", sync_inst);
+    auto GEP = GetElementPtrInst::Create(warp_vote_ptr->getValueType(),
+                                         warp_vote_ptr,            // Alloca
+                                         {zero, intra_warp_index}, // Indices
+                                         "", sync_inst);
 
     // as AVX only support 8bit for each thread
     // so we have to cast the predict into int8

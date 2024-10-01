@@ -15,7 +15,6 @@ void set_meta_data(llvm::Module *M) {
 // as pthread only accept a single void* for input
 // we have to decode this input inside the kernel
 void decode_input(llvm::Module *M) {
-
   std::set<llvm::Function *> need_remove;
 
   llvm::Type *Int32T = Type::getInt32Ty(M->getContext());
@@ -66,12 +65,13 @@ void decode_input(llvm::Module *M) {
          ii != ee; ++ii) {
       Type *ArgType = ii->getType();
       // calculate addr
-      Value *GEP = createGEP(Builder, input_arg, ConstantInt::get(Int32T, idx));
+      Value *GEP = Builder.CreateGEP(PointerType::get(Int32T, 0), input_arg,
+                                     ConstantInt::get(Int32T, idx));
       // load corresponding int*
-      GEP = createLoad(Builder, GEP);
+      GEP = Builder.CreateLoad(PointerType::get(Int32T, 0), GEP);
       // bitcast
       GEP = Builder.CreateBitOrPointerCast(GEP, PointerType::get(ArgType, 0));
-      Value *Arg = createLoad(Builder, GEP);
+      Value *Arg = Builder.CreateLoad(ArgType, GEP);
       Arguments.push_back(Arg);
       ++idx;
     }

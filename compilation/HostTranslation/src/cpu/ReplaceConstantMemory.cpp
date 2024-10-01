@@ -1,4 +1,5 @@
 #include "ReplaceConstantMemory.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include <assert.h>
 #include <fstream>
@@ -49,7 +50,7 @@ void ReplaceConstantMemory(llvm::Module *M, std::ifstream &fin) {
         if (auto PT = dyn_cast<llvm::PointerType>(I->getType())) {
           need_remove_constant_memory.insert(constant_memory);
           // generate the corresponding global memory variable
-          auto element_type = PT->getElementType();
+          auto element_type = constant_memory->getValueType();
           if (auto array_type = dyn_cast<llvm::ArrayType>(element_type)) {
             llvm::GlobalVariable *global_memory = new llvm::GlobalVariable(
                 *M, array_type, false, llvm::GlobalValue::CommonLinkage, NULL,

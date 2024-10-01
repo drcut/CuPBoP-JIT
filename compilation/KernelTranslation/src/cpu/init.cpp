@@ -2,12 +2,14 @@
 #include "debug.hpp"
 #include "memory_hierarchy.h"
 #include "tool.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <set>
-
 using namespace llvm;
 
 bool inline_warp_level_func(llvm::Module *M) {
@@ -104,50 +106,51 @@ void create_global_variable(llvm::Module *M) {
   // we need global variable used for warp shuffle
   llvm::Type *WarpArrayType = llvm::ArrayType::get(I32, 32);
   llvm::Type *VoteArrayType = llvm::ArrayType::get(I8, 32);
-
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           zero, "intra_warp_index", NULL,
+                           zero, "intra_warp_index", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           zero, "inter_warp_index", NULL,
+                           zero, "inter_warp_index", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_size", NULL,
+                           nullptr, "block_size", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_size_x", NULL,
+                           nullptr, "block_size_x", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_size_y", NULL,
+                           nullptr, "block_size_y", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_size_z", NULL,
+                           nullptr, "block_size_z", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "grid_size_x", NULL,
+                           nullptr, "grid_size_x", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "grid_size_y", NULL,
+                           nullptr, "grid_size_y", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "grid_size_z", NULL,
+                           nullptr, "grid_size_z", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_index_x", NULL,
+                           nullptr, "block_index_x", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_index_y", NULL,
+                           nullptr, "block_index_y", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   new llvm::GlobalVariable(*M, I32, false, llvm::GlobalValue::ExternalLinkage,
-                           NULL, "block_index_z", NULL,
+                           nullptr, "block_index_z", nullptr,
                            llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   // TLS variable used for warp-level collective operators
-  new llvm::GlobalVariable(
-      *M, WarpArrayType, false, llvm::GlobalValue::ExternalLinkage, NULL,
-      "warp_shfl", NULL, llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
+  new llvm::GlobalVariable(*M, WarpArrayType, false,
+                           llvm::GlobalValue::ExternalLinkage, nullptr,
+                           "warp_shfl", nullptr,
+                           llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
   auto warp_vote = new llvm::GlobalVariable(
-      *M, VoteArrayType, false, llvm::GlobalValue::ExternalLinkage, NULL,
-      "warp_vote", NULL, llvm::GlobalValue::GeneralDynamicTLSModel, 0, false);
+      *M, VoteArrayType, false, llvm::GlobalValue::ExternalLinkage, nullptr,
+      "warp_vote", nullptr, llvm::GlobalValue::GeneralDynamicTLSModel, 0,
+      false);
   warp_vote->setAlignment(llvm::MaybeAlign(32));
 }
 
@@ -157,7 +160,7 @@ void remove_metadata(llvm::Module *M) {
     Function *F = &(*i);
     F->getAllMetadata(MDs);
     for (auto &MD : MDs) {
-      F->setMetadata(MD.first, NULL);
+      F->setMetadata(MD.first, nullptr);
     }
     F->removeFnAttr("target-features");
     F->removeFnAttr("target-cpu");

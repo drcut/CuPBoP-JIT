@@ -95,8 +95,7 @@ llvm::Instruction *GetContextArray(llvm::Instruction *instruction,
 
   llvm::Type *elementType;
   if (isa<AllocaInst>(instruction)) {
-    elementType =
-        dyn_cast<AllocaInst>(instruction)->getType()->getArrayElementType();
+    elementType = dyn_cast<AllocaInst>(instruction)->getAllocatedType();
   } else {
     elementType = instruction->getType();
   }
@@ -245,9 +244,8 @@ void handle_alloc(llvm::Function *F) {
     auto block_size = createLoad(builder, block_size_addr);
 
     llvm::Type *elementType = NULL;
-    if (dyn_cast<AllocaInst>(inst)->getType()->getArrayElementType()) {
-      elementType =
-          dyn_cast<AllocaInst>(inst)->getType()->getArrayElementType();
+    if (dyn_cast<AllocaInst>(inst)) {
+      elementType = dyn_cast<AllocaInst>(inst)->getAllocatedType();
     }
     assert(elementType != NULL);
 
@@ -355,9 +353,8 @@ void handle_local_variable_intra_warp(std::vector<ParallelRegion> PRs,
                                  ->getParent()
                                  ->getEntryBlock()
                                  .getFirstInsertionPt()));
-      auto newAllocInst =
-          builder.CreateAlloca(alloc->getType()->getArrayElementType(),
-                               alloc->getArraySize(), alloc->getName());
+      auto newAllocInst = builder.CreateAlloca(
+          alloc->getAllocatedType(), alloc->getArraySize(), alloc->getName());
       alloc->replaceAllUsesWith(newAllocInst);
       alloc->removeFromParent();
     }
@@ -612,6 +609,7 @@ public:
     AU.addRequired<DominatorTreeWrapperPass>();
     AU.addRequired<PostDominatorTreeWrapperPass>();
     AU.addRequired<TargetTransformInfoWrapperPass>();
+    AU.addRequired<UniformityInfoWrapperPass>();
   }
 
   void getParallelRegionBefore(llvm::BasicBlock *B, bool intra_warp_loop,
@@ -797,8 +795,7 @@ public:
     // get DivergenceInfo
     auto DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     auto PDT = &getAnalysis<PostDominatorTreeWrapperPass>().getPostDomTree();
-    auto &DI =
-        getAnalysis<UniformityInfoWrapperPass>().getUniformityInfo();
+    auto &DI = getAnalysis<UniformityInfoWrapperPass>().getUniformityInfo();
 
     // find parallel region we need to wrap
     auto parallel_regions = getParallelRegions(&F, intra_warp_loop);

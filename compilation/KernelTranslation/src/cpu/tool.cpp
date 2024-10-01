@@ -213,8 +213,8 @@ void replace_dynamic_shared_memory(llvm::Module *M) {
       return;
     }
     auto load_shared_memory = new LoadInst(
-        dynamic_shared_memory_addr->getType()->getPointerElementType(),
-        dynamic_shared_memory_addr, "new_load", &*F->begin()->begin());
+        dynamic_shared_memory_addr->getValueType(), dynamic_shared_memory_addr,
+        "new_load", &*F->begin()->begin());
     auto new_bit_cast =
         new BitCastInst(load_shared_memory,
                         dynamic_shared_memory_addr->getType(), "new_bit_cast");
@@ -239,9 +239,8 @@ void replace_built_in_function(llvm::Module *M) {
     IRBuilder<> builder(&*(F->getEntryBlock().getFirstInsertionPt()));
     auto global_intra_warp_idx =
         F->getParent()->getGlobalVariable("intra_warp_index");
-    auto local_intra_warp_idx =
-        builder.CreateAlloca(global_intra_warp_idx->getType()->getElementType(),
-                             0, "local_intra_warp_idx");
+    auto local_intra_warp_idx = builder.CreateAlloca(
+        global_intra_warp_idx->getValueType(), 0, "local_intra_warp_idx");
     global_intra_warp_idx->replaceUsesWithIf(local_intra_warp_idx, [&](Use &U) {
       auto *Instr = dyn_cast<Instruction>(U.getUser());
       return Instr->getParent()->getParent()->getName().str() == func_name;
@@ -250,9 +249,8 @@ void replace_built_in_function(llvm::Module *M) {
     auto global_inter_warp_idx =
         F->getParent()->getGlobalVariable("inter_warp_index");
 
-    auto local_inter_warp_idx =
-        builder.CreateAlloca(global_inter_warp_idx->getType()->getElementType(),
-                             0, "local_inter_warp_idx");
+    auto local_inter_warp_idx = builder.CreateAlloca(
+        global_inter_warp_idx->getValueType(), 0, "local_inter_warp_idx");
 
     builder.CreateStore(ConstantInt::get(I32, 0), local_inter_warp_idx);
 
@@ -418,7 +416,7 @@ void replace_built_in_function(llvm::Module *M) {
                */
               // find/create C's printf function
               std::vector<llvm::Type *> args;
-              args.push_back(llvm::Type::getInt8PtrTy(context));
+              args.push_back(PointerType::getUnqual(context));
               llvm::FunctionType *printfType =
                   FunctionType::get(I32, args, true);
 
@@ -435,9 +433,14 @@ void replace_built_in_function(llvm::Module *M) {
               auto compressed_args = Call->getArgOperand(1);
               if (auto BC = dyn_cast<BitCastInst>(compressed_args)) {
                 auto src_alloc = BC->getOperand(0);
+                assert(dyn_cast<AllocaInst>(src_alloc));
                 auto SrcPointTy =
                     dyn_cast<PointerType>(BC->getOperand(0)->getType());
-                auto SrcTy = SrcPointTy->getElementType();
+
+                llvm::Type *SrcTy = nullptr;
+                if (auto allocaInst = dyn_cast<AllocaInst>(src_alloc)) {
+                  SrcTy = allocaInst->getAllocatedType();
+                }
                 // reverse the bitcast
                 new BitCastInst(BC, SrcPointTy, "", Call);
                 assert(SrcTy->isStructTy() == 1);
@@ -446,15 +449,27 @@ void replace_built_in_function(llvm::Module *M) {
                   std::vector<Value *> Indices;
                   Indices.push_back(ConstantInt::get(I32, 0));
                   Indices.push_back(ConstantInt::get(I32, i));
-                  auto new_GEP = GetElementPtrInst::Create(
-                      cast<PointerType>(src_alloc->getType()->getScalarType())
-                          ->getElementType(),
-                      src_alloc, // Alloca
-                      Indices,   // Indices
-                      "", Call);
-                  auto new_load =
-                      new LoadInst(new_GEP->getType()->getPointerElementType(),
-                                   new_GEP, "", Call);
+                  llvm::Type *elementType = nullptr;
+                  if (auto allocaInst =
+                          llvm::dyn_cast<llvm::AllocaInst>(src_alloc)) {
+                    elementType = allocaInst->getAllocatedType();
+                  } else if (auto globalVar =
+                                 llvm::dyn_cast<llvm::GlobalVariable>(
+                                     src_alloc)) {
+                    elementType = globalVar->getValueType();
+                  } else if (auto loadInst =
+                                 llvm::dyn_cast<llvm::LoadInst>(src_alloc)) {
+                    elementType = loadInst->getType();
+                  } else if (auto gepInst =
+                                 llvm::dyn_cast<llvm::GetElementPtrInst>(
+                                     src_alloc)) {
+                    elementType = gepInst->getResultElementType();
+                  }
+                  auto new_GEP = GetElementPtrInst::Create(elementType,
+                                                           src_alloc, // Alloca
+                                                           Indices,   // Indices
+                                                           "", Call);
+                  auto new_load = new LoadInst(elementType, new_GEP, "", Call);
                   printf_args.push_back(new_load);
                 }
               }
@@ -651,17 +666,65 @@ bool find_barrier_in_region(llvm::BasicBlock *start, llvm::BasicBlock *end) {
 }
 
 LoadInst *createLoad(IRBuilder<> &B, Value *addr, bool isVolatile) {
-  return B.CreateLoad(addr->getType()->getPointerElementType(), addr,
-                      isVolatile);
+  llvm::Type *elementType = nullptr;
+  if (auto *allocaInst = dyn_cast<AllocaInst>(addr)) {
+    elementType = allocaInst->getAllocatedType();
+  } else if (auto *globalVar = dyn_cast<GlobalVariable>(addr)) {
+    elementType = globalVar->getValueType();
+  } else if (auto *gepInst = dyn_cast<GetElementPtrInst>(addr)) {
+    elementType = gepInst->getResultElementType();
+  } else {
+    errs() << "Unable to determine element type for addr in createLoad\n";
+    return nullptr; // Handle the error as appropriate
+  }
+  if (!elementType) {
+    errs() << "Element type is null for addr in createLoad\n";
+    return nullptr; // Handle the error as appropriate
+  }
+  LoadInst *loadInst = B.CreateLoad(elementType, addr);
+  loadInst->setVolatile(isVolatile);
+  return loadInst;
 }
 
 Value *createInBoundsGEP(IRBuilder<> &B, Value *ptr,
                          ArrayRef<Value *> idxlist) {
-  return B.CreateInBoundsGEP(
-      ptr->getType()->getScalarType()->getPointerElementType(), ptr, idxlist);
+  llvm::Type *elementType = nullptr;
+  if (auto *allocaInst = dyn_cast<AllocaInst>(ptr)) {
+    elementType = allocaInst->getAllocatedType();
+  } else if (auto *globalVar = dyn_cast<GlobalVariable>(ptr)) {
+    elementType = globalVar->getValueType();
+  } else if (auto *gepInst = dyn_cast<GetElementPtrInst>(ptr)) {
+    elementType = gepInst->getResultElementType();
+  } else {
+    errs() << "Unable to determine element type for ptr in createInBoundsGEP\n";
+    return nullptr;
+  }
+
+  if (!elementType) {
+    errs() << "Element type is null for ptr in createInBoundsGEP\n";
+    return nullptr;
+  }
+  return B.CreateInBoundsGEP(elementType, ptr, idxlist);
 }
 
 Value *createGEP(IRBuilder<> &B, Value *ptr, ArrayRef<Value *> idxlist) {
-  return B.CreateGEP(ptr->getType()->getScalarType()->getPointerElementType(),
-                     ptr, idxlist);
+  llvm::Type *elementType = nullptr;
+  if (auto *allocaInst = dyn_cast<AllocaInst>(ptr)) {
+    elementType = allocaInst->getAllocatedType();
+  } else if (auto *globalVar = dyn_cast<GlobalVariable>(ptr)) {
+    elementType = globalVar->getValueType();
+  } else if (auto *gepInst = dyn_cast<GetElementPtrInst>(ptr)) {
+    elementType = gepInst->getResultElementType();
+  } else if (auto *bitCastInst = dyn_cast<BitCastInst>(ptr)) {
+    elementType = bitCastInst->getDestTy();
+  } else {
+    ptr->dump();
+    errs() << "Unable to determine element type for ptr in createGEP\n";
+    return nullptr;
+  }
+  if (!elementType) {
+    errs() << "Element type is null for ptr in createGEP\n";
+    return nullptr;
+  }
+  return B.CreateGEP(elementType, ptr, idxlist);
 }

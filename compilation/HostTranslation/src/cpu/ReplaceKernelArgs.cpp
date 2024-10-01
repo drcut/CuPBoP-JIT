@@ -28,7 +28,7 @@ void ReplaceKernelArg(llvm::Module *M) {
         Instruction *inst = &(*i);
         if (llvm::CallInst *callInst = llvm::dyn_cast<llvm::CallInst>(inst)) {
           if (Function *calledFunction = callInst->getCalledFunction()) {
-            if (calledFunction->getName().startswith("cudaLaunchKernel")) {
+            if (calledFunction->getName().starts_with("cudaLaunchKernel")) {
               need_replace.insert(F);
             }
           }
@@ -39,9 +39,9 @@ void ReplaceKernelArg(llvm::Module *M) {
 
   // find/create C's malloc function
   std::vector<llvm::Type *> args;
-  args.push_back(llvm::Type::getInt8PtrTy(context));
+  args.push_back(PointerType::getUnqual(context));
   llvm::FunctionType *mallocFuncType =
-      FunctionType::get(llvm::Type::getInt8PtrTy(context),
+      FunctionType::get(PointerType::getUnqual(context),
                         {llvm::Type::getInt64Ty(context)}, false);
 
   llvm::FunctionCallee _f = M->getOrInsertFunction("malloc", mallocFuncType);

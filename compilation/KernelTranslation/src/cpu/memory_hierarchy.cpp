@@ -1,5 +1,6 @@
 #include "memory_hierarchy.h"
 #include "debug.hpp"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include <map>
 #include <set>
@@ -18,7 +19,7 @@ void mem_share2global(llvm::Module *M) {
           need_remove_share_memory.insert(share_memory);
           // generate the corresponding global memory variable
           auto new_name = "wrapper_global_" + share_memory->getName().str();
-          auto element_type = PT->getElementType();
+          auto element_type = share_memory->getValueType();
           if (auto array_type = dyn_cast<ArrayType>(element_type)) {
             if (share_memory->hasExternalLinkage() &&
                 array_type->getArrayNumElements() == 0) {
@@ -121,7 +122,7 @@ void mem_constant2global(llvm::Module *M, std::ofstream &fout) {
           need_remove_constant_memory.insert(constant_memory);
           // generate the corresponding global memory variable
           auto new_name = "wrapper_global_" + constant_memory->getName().str();
-          auto element_type = PT->getElementType();
+          auto element_type = constant_memory->getValueType();
           if (auto array_type = dyn_cast<ArrayType>(element_type)) {
             if (constant_memory->hasExternalLinkage() &&
                 array_type->getArrayNumElements() == 0) {

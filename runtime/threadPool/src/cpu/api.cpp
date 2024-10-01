@@ -126,7 +126,7 @@ int get_work(c_thread *th) {
     // try to get a task from the queue
     cu_kernel *k;
     th->busy = scheduler->kernelQueue->wait_dequeue_timed(
-        k, std::chrono::milliseconds(5));
+        k, std::chrono::milliseconds(1));
     if (th->busy) {
       // set runtime configuration
       gridDim = k->gridDim;

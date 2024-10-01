@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
+include_directories(../common)
 
 # build kernel translator
 include_directories(./KernelTranslation/include/cpu)
