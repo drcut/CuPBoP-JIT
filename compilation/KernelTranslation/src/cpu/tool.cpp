@@ -1,10 +1,13 @@
 #include "tool.h"
 #include "debug.hpp"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -406,14 +409,11 @@ void replace_built_in_function(llvm::Module *M) {
           if (Call->getCalledFunction()) {
             auto func_name = Call->getCalledFunction()->getName().str();
             if (func_name == "vprintf") {
-              /*
-               * replace CUDA's printf to C's printf
-               * CUDA:
-               * %0 = tail call i32 @vprintf(i8* getelementptr inbounds ([19 x
-               * i8], [19 x i8]* @.str, i64 0, i64 0), i8* null)
-               * C: %call1 = call i32 (i8*, ...) @printf(i8* getelementptr
-               * inbounds ([45 x i8], [45 x i8]* @.str.1, i64 0, i64 0))
-               */
+              // replace CUDA's printf to C's printf
+              // CUDA printf is not a variadic function
+              // But C printf is a variadic function
+              // We need to extract the arguments from a pointer to a list
+
               // find/create C's printf function
               std::vector<llvm::Type *> args;
               args.push_back(PointerType::getUnqual(context));
@@ -424,53 +424,35 @@ void replace_built_in_function(llvm::Module *M) {
                   M->getOrInsertFunction("printf", printfType);
               llvm::Function *func_printf =
                   llvm::cast<llvm::Function>(_f.getCallee());
-              // construct argument(s)
+              // construct argument(s) from CUDA's vprintf
               std::vector<Value *> printf_args;
               // first argument is same between CUDA and C
               auto placeholder = Call->getArgOperand(0);
               printf_args.push_back(placeholder);
               // insert arguments
-              auto compressed_args = Call->getArgOperand(1);
-              if (auto BC = dyn_cast<BitCastInst>(compressed_args)) {
-                auto src_alloc = BC->getOperand(0);
-                assert(dyn_cast<AllocaInst>(src_alloc));
-                auto SrcPointTy =
-                    dyn_cast<PointerType>(BC->getOperand(0)->getType());
-
-                llvm::Type *SrcTy = nullptr;
-                if (auto allocaInst = dyn_cast<AllocaInst>(src_alloc)) {
-                  SrcTy = allocaInst->getAllocatedType();
-                }
-                // reverse the bitcast
-                new BitCastInst(BC, SrcPointTy, "", Call);
-                assert(SrcTy->isStructTy() == 1);
-                auto StructTy = dyn_cast<StructType>(SrcTy);
-                for (int i = 0; i < StructTy->getNumElements(); i++) {
-                  std::vector<Value *> Indices;
-                  Indices.push_back(ConstantInt::get(I32, 0));
-                  Indices.push_back(ConstantInt::get(I32, i));
-                  llvm::Type *elementType = nullptr;
-                  if (auto allocaInst =
-                          llvm::dyn_cast<llvm::AllocaInst>(src_alloc)) {
-                    elementType = allocaInst->getAllocatedType();
-                  } else if (auto globalVar =
-                                 llvm::dyn_cast<llvm::GlobalVariable>(
-                                     src_alloc)) {
-                    elementType = globalVar->getValueType();
-                  } else if (auto loadInst =
-                                 llvm::dyn_cast<llvm::LoadInst>(src_alloc)) {
-                    elementType = loadInst->getType();
-                  } else if (auto gepInst =
-                                 llvm::dyn_cast<llvm::GetElementPtrInst>(
-                                     src_alloc)) {
-                    elementType = gepInst->getResultElementType();
+              auto allocaInst = dyn_cast<AllocaInst>(Call->getArgOperand(1));
+              if (!allocaInst) {
+                printf("Error: the second arguments for CUDA printf is not an "
+                       "allocaInst\n");
+                exit(1);
+              }
+              for (User *U : allocaInst->users()) {
+                if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(U)) {
+                  if (ConstantInt *Index =
+                          dyn_cast<ConstantInt>(GEP->getOperand(2))) {
+                    unsigned ArgIndex = Index->getZExtValue();
+                    // Find the store instruction that uses this GEP
+                    for (User *GU : GEP->users()) {
+                      if (StoreInst *Store = dyn_cast<StoreInst>(GU)) {
+                        Value *Arg = Store->getValueOperand();
+                        if (printf_args.size() < ArgIndex + 2)
+                          printf_args.resize(ArgIndex + 2);
+                        // The first argument is the format string,
+                        // so we need to skip it
+                        printf_args[ArgIndex + 1] = Arg;
+                      }
+                    }
                   }
-                  auto new_GEP = GetElementPtrInst::Create(elementType,
-                                                           src_alloc, // Alloca
-                                                           Indices,   // Indices
-                                                           "", Call);
-                  auto new_load = new LoadInst(elementType, new_GEP, "", Call);
-                  printf_args.push_back(new_load);
                 }
               }
               auto c_printf_inst =

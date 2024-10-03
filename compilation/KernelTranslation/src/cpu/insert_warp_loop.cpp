@@ -31,6 +31,7 @@ class CustomDivergenceAnalysis {
 
 public:
   void analyze(Function &F) {
+    printf("analyze divergence\n");
     // Identify divergence sources
     for (Instruction &I : instructions(F)) {
       if (isDivergenceSource(&I)) {
@@ -43,11 +44,18 @@ public:
     while (!Worklist.empty()) {
       const Instruction *Inst = Worklist.front();
       Worklist.pop();
-
-      for (const Use &U : Inst->uses()) {
-        const Instruction *UserInst = dyn_cast<Instruction>(U.getUser());
-        if (UserInst && DivergentValues.insert(UserInst).second) {
-          Worklist.push(UserInst);
+      if (auto storeInst = dyn_cast<StoreInst>(Inst)) {
+        const Instruction *storeLocation =
+            dyn_cast<Instruction>(storeInst->getOperand(1));
+        if (storeLocation && DivergentValues.insert(storeLocation).second) {
+          Worklist.push(storeLocation);
+        }
+      } else {
+        for (const Use &U : Inst->uses()) {
+          const Instruction *UserInst = dyn_cast<Instruction>(U.getUser());
+          if (UserInst && DivergentValues.insert(UserInst).second) {
+            Worklist.push(UserInst);
+          }
         }
       }
     }
@@ -390,7 +398,12 @@ void handle_local_variable_intra_warp(std::vector<ParallelRegion> PRs,
               break;
             }
           }
-          if (!used_in_non_PR) {
+          // Do not duplicate var used only by a single PR
+          int used_PR = 0;
+          for (auto PR : PRs) {
+            used_PR += PR.inst_used_in_region(alloc);
+          }
+          if (!used_in_non_PR && used_PR > 1) {
             instruction_to_fix.push_back(alloc);
           } else {
             instruction_to_move.push_back(alloc);

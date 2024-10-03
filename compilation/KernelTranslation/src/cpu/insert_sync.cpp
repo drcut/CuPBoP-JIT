@@ -26,10 +26,13 @@ public:
     std::vector<llvm::Instruction *> insert_intra_warp_sync_before;
     std::vector<llvm::Instruction *> insert_inter_warp_sync_before;
 
-    // insert sync after the entry and before the first non-AllocaInst
+    // insert sync after the entry and before the first non-AllocaInst/load/cast
+    // instruction The idea is the make as many as possible instructions in the
+    // first block, so that we do not need to execute these instructions
+    // multiple times (in intra-warp loops).
     BasicBlock *entry = &(*F.begin());
     for (auto i = entry->begin(); i != entry->end(); i++) {
-      if (!isa<AllocaInst>(i)) {
+      if (!isa<AllocaInst>(i) && !isa<LoadInst>(i) && !isa<CastInst>(i)) {
         insert_inter_warp_sync_before.push_back(&(*(i)));
         break;
       }

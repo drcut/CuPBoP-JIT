@@ -9,17 +9,10 @@ using namespace llvm;
 
 void split_block_by_sync(llvm::Function *F) {
   std::set<llvm::Instruction *> sync_inst;
-  bool jump_first_sync = 1;
   for (Function::iterator b = F->begin(); b != F->end(); ++b) {
     BasicBlock *B = &(*b);
     for (BasicBlock::iterator i = B->begin(); i != B->end(); ++i) {
       Instruction *inst = &(*i);
-      if (jump_first_sync) {
-        jump_first_sync = 0;
-        Instruction *next_inst = &(*std::next(i));
-        sync_inst.insert(next_inst);
-        continue;
-      }
       llvm::CallInst *Call = llvm::dyn_cast<llvm::CallInst>(inst);
       if (Call) {
         if (Call->isInlineAsm())
