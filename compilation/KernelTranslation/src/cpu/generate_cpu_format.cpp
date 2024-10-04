@@ -1,7 +1,11 @@
 #include "generate_cpu_format.h"
 #include "debug.hpp"
 #include "tool.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include <map>
 #include <set>
 using namespace llvm;
 
@@ -112,12 +116,100 @@ void remove_useless_var(llvm::Module *M) {
   M->getGlobalVariable("inter_warp_index")->eraseFromParent();
 }
 
+// Since Triton cannot support extern variables, as we need to
+// make kernel as a shared library. We need to replace the extern
+// variables with arguments
+void replace_global_variables(Module *M) {
+  std::vector<std::string> globalVariablesToReplace = {
+      "block_size",    "block_size_x", "block_size_y", "block_size_z",
+      "grid_size_x",   "grid_size_y",  "grid_size_z",  "block_index_x",
+      "block_index_y", "block_index_z"};
+  std::map<std::string, GlobalVariable *> globalsMap;
+  for (auto &GVName : globalVariablesToReplace) {
+    GlobalVariable *GV = M->getGlobalVariable(GVName);
+    if (GV) {
+      globalsMap[GVName] = GV;
+    }
+  }
+
+  std::set<Function *> need_wrapper;
+  for (Function &F : *M) {
+    if (!isKernelFunction(M, &F))
+      continue;
+    need_wrapper.insert(&F);
+  }
+  for (auto &F : need_wrapper) {
+    // Clone the function, with a new signature (more arguments)
+    std::vector<Type *> paramTypes;
+    for (auto &Arg : F->args()) {
+      paramTypes.push_back(Arg.getType());
+    }
+    // Add types of the global variables
+    for (auto global_name : globalVariablesToReplace) {
+      GlobalVariable *GV = M->getGlobalVariable(global_name);
+      paramTypes.push_back(GV->getValueType());
+    }
+
+    // Create new function
+    FunctionType *newFuncType =
+        FunctionType::get(F->getReturnType(), paramTypes, F->isVarArg());
+    Function *newFunc =
+        Function::Create(newFuncType, F->getLinkage(),
+                         F->getName() + "_wrapper", F->getParent());
+    newFunc->copyAttributesFrom(F);
+    newFunc->setCallingConv(F->getCallingConv());
+
+    ValueToValueMapTy VMap;
+    ValueToValueMapTy argMap;
+    auto newArgIt = newFunc->arg_begin();
+    for (auto &Arg : F->args()) {
+      newArgIt->setName(Arg.getName());
+      VMap[&Arg] = &*newArgIt;
+      ++newArgIt;
+    }
+    for (auto &GVName : globalVariablesToReplace) {
+      newArgIt->setName(GVName);
+      GlobalVariable *GV = globalsMap[GVName];
+      argMap[GV] = &*newArgIt;
+      ++newArgIt;
+    }
+    SmallVector<ReturnInst *, 8> Returns;
+    CloneFunctionInto(newFunc, F, VMap,
+                      CloneFunctionChangeType::LocalChangesOnly, Returns);
+    F->replaceAllUsesWith(newFunc);
+    F->eraseFromParent();
+
+    // Replace the global variable with the argument
+    std::set<LoadInst *> need_replace;
+    for (Instruction &I : instructions(*newFunc)) {
+      if (llvm::LoadInst *loadInst = dyn_cast<llvm::LoadInst>(&I)) {
+        if (GlobalVariable *GV =
+                dyn_cast<GlobalVariable>(loadInst->getOperand(0))) {
+          need_replace.insert(loadInst);
+        }
+      }
+    }
+    for (auto inst : need_replace) {
+      auto newArgIt = argMap[cast<GlobalVariable>(inst->getOperand(0))];
+      inst->replaceAllUsesWith(&*newArgIt);
+      inst->eraseFromParent();
+    }
+  }
+  // Erase the global variables
+  for (auto &GVName : globalVariablesToReplace) {
+    GlobalVariable *GV = M->getGlobalVariable(GVName);
+    if (GV) {
+      GV->eraseFromParent();
+    }
+  }
+}
+
 void generate_cpu_format(llvm::Module *M) {
   DEBUG_INFO("generate cpu format\n");
   // change metadata
   set_meta_data(M);
-  // decode argument
-  decode_input(M);
+  // replace global variables with arguments
+  replace_global_variables(M);
   // remove barrier
   remove_barrier(M);
   // remove useless func/variable
