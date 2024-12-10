@@ -185,7 +185,8 @@ void replace_global_variables(Module *M) {
       if (llvm::LoadInst *loadInst = dyn_cast<llvm::LoadInst>(&I)) {
         if (GlobalVariable *GV =
                 dyn_cast<GlobalVariable>(loadInst->getOperand(0))) {
-          need_replace.insert(loadInst);
+          if (globalsMap.find(GV->getName().str()) != globalsMap.end())
+            need_replace.insert(loadInst);
         }
       }
     }
@@ -206,12 +207,12 @@ void replace_global_variables(Module *M) {
 
 void generate_cpu_format(llvm::Module *M) {
   DEBUG_INFO("generate cpu format\n");
-  // change metadata
+  // Reset metadata
   set_meta_data(M);
-  // replace global variables with arguments
+  // Replace global variables with arguments
   replace_global_variables(M);
-  // remove barrier
+  // Remove barrier
   remove_barrier(M);
-  // remove useless func/variable
+  // Remove useless func/variable
   remove_useless_var(M);
 }
