@@ -129,7 +129,9 @@ bool ShouldNotBeContextSaved(llvm::Instruction *instr,
     if (load_addr == M->getGlobalVariable("warp_vote"))
       return true;
   }
-  return !DI.isDivergent(instr);
+  return false;
+  // TODO: For variables that are not divergent, we can avoid extending them to
+  // arrays return !DI.isDivergent(instr);
 }
 
 // generate countpart alloc in the beginning of the Function
@@ -453,6 +455,7 @@ void handle_local_variable_intra_warp(std::vector<ParallelRegion> PRs,
 
           if (user == NULL)
             continue;
+          // We need to duplicate variable if it is used outside the PR
           if (isa<AllocaInst>(instruction) ||
               (instruction_in_region.find(user) ==
                instruction_in_region.end())) {
