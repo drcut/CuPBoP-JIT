@@ -481,10 +481,61 @@ public:
   }
 };
 
+class RemoveDuplicateBarrier : public llvm::FunctionPass {
+
+public:
+  static char ID;
+
+  RemoveDuplicateBarrier() : FunctionPass(ID) {}
+
+  bool isBarrier(llvm::Instruction *inst) {
+    llvm::CallInst *Call = llvm::dyn_cast<llvm::CallInst>(inst);
+    if (Call) {
+      if (Call->isInlineAsm())
+        return false;
+      auto func_name = Call->getCalledFunction()->getName().str();
+      if (func_name == "llvm.nvvm.barrier0" ||
+          func_name == "llvm.nvvm.bar.warp.sync" ||
+          func_name == "llvm.nvvm.barrier.sync") {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  virtual bool runOnFunction(Function &F) {
+    if (!isKernelFunction(F.getParent(), &F))
+      return 0;
+    std::vector<llvm::Instruction *> duplicateBarrier;
+
+    for (Function::iterator I = F.begin(); I != F.end(); ++I) {
+      bool prevBarrier = false;
+      for (BasicBlock::iterator BI = I->begin(); BI != I->end(); BI++) {
+        llvm::Instruction *inst = &(*BI);
+        if (isBarrier(inst)) {
+          if (prevBarrier) {
+            duplicateBarrier.push_back(inst);
+          }
+          prevBarrier = true;
+        } else {
+          prevBarrier = false;
+        }
+      }
+    }
+    if (duplicateBarrier.empty())
+      return 0;
+    for (auto inst : duplicateBarrier) {
+      inst->eraseFromParent();
+    }
+    return 1;
+  }
+};
+
 char InsertBuiltInBarrier::ID = 0;
 char InsertConditionalBarrier::ID = 0;
 char InsertConditionalForBarrier::ID = 0;
 char InsertBarrierForSpecialCase::ID = 0;
+char RemoveDuplicateBarrier::ID = 0;
 
 namespace {
 static RegisterPass<InsertConditionalBarrier>
@@ -499,6 +550,9 @@ static RegisterPass<InsertBarrierForSpecialCase>
 static RegisterPass<InsertBuiltInBarrier>
     insert_built_in_barrier("insert-built-in-barriers",
                             "Insert built in barriers");
+static RegisterPass<RemoveDuplicateBarrier>
+    remove_duplicate_barrier("remove-duplicate-barriers",
+                             "Remove duplicate barriers");
 } // namespace
 
 /*
@@ -516,6 +570,7 @@ void insert_sync(llvm::Module *M) {
   passes.push_back("insert-conditional-if-barriers");
   passes.push_back("insert-conditional-for-barriers");
   passes.push_back("insert-special-case-barriers");
+  passes.push_back("remove-duplicate-barriers");
   for (auto pass : passes) {
     const PassInfo *PIs = Registry->getPassInfo(StringRef(pass));
     if (PIs) {
