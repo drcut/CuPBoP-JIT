@@ -463,6 +463,7 @@ void replace_built_in_function(llvm::Module *M) {
             } else if (func_name == "__nv_fast_log2f" ||
                        func_name == "__nv_log2f" ||
                        func_name == "__nv_fast_powf" ||
+                       func_name == "__nv_fast_expf" ||
                        func_name == "__nv_powf" || func_name == "__nv_logf" ||
                        func_name == "__nv_expf" || func_name == "__nv_fabsf" ||
                        func_name == "__nv_log10f" ||

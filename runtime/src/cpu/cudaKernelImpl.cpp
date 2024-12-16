@@ -1,6 +1,7 @@
 #include "cudaKernelImpl.h"
 #include <math.h>
 double __nv_exp(double base) { return exp(base); }
+float __nv_fast_expf(float base) { return expf(base); }
 double __nv_sqrt(double v) { return sqrt(v); }
 float __nv_sqrtf(float v) { return sqrt(v); }
 float __nv_powif(float base, int exp) { return pow(base, exp); }

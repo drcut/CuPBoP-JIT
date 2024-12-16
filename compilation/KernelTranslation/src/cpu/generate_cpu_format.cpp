@@ -116,14 +116,14 @@ void remove_useless_var(llvm::Module *M) {
   M->getGlobalVariable("inter_warp_index")->eraseFromParent();
 }
 
-// Since Triton cannot support extern variables, as we need to
+// Since Triton cannot support extern variables, and we need to
 // make kernel as a shared library. We need to replace the extern
-// variables with arguments
+// variables by arguments
 void replace_global_variables(Module *M) {
   std::vector<std::string> globalVariablesToReplace = {
-      "block_size",    "block_size_x", "block_size_y", "block_size_z",
-      "grid_size_x",   "grid_size_y",  "grid_size_z",  "block_index_x",
-      "block_index_y", "block_index_z"};
+      "block_size",    "block_size_x",  "block_size_y",         "block_size_z",
+      "grid_size_x",   "grid_size_y",   "grid_size_z",          "block_index_x",
+      "block_index_y", "block_index_z", "dynamic_shared_memory"};
   std::map<std::string, GlobalVariable *> globalsMap;
   for (auto &GVName : globalVariablesToReplace) {
     GlobalVariable *GV = M->getGlobalVariable(GVName);

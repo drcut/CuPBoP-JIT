@@ -9,6 +9,7 @@ float __nv_sqrtf(float);
 float __nv_powif(float, int);
 float __nv_logf(float);
 float __nv_expf(float);
+float __nv_fast_expf(float);
 float __nv_log10f(float);
 float __nv_fast_log2f(float);
 double __nv_powi(double, int);
