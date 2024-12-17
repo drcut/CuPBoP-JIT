@@ -493,6 +493,8 @@ void replace_built_in_function(llvm::Module *M) {
               Call->getCalledFunction()->setName("__nv_fmind");
             } else if (func_name == "llvm.nvvm.fmax.d") {
               Call->getCalledFunction()->setName("__nv_fmaxd");
+            } else if (func_name == "llvm.nvvm.mulhi.ui") {
+              Call->getCalledFunction()->setName("__nvvm_mulhi_ui");
             }
           }
         }

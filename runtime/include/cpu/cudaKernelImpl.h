@@ -23,6 +23,7 @@ double __nv_fabsd(double);
 double __nv_fmind(double, double);
 double __nv_fmaxd(double, double);
 int __nvvm_mul24_i(int, int);
+int __nvvm_mulhi_ui(int, int);
 double _ZL3expd(double);
 double _ZL8copysigndd(double, double);
 }

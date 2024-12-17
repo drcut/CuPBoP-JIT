@@ -20,5 +20,9 @@ double __nv_fabsd(double v) { return abs(v); }
 double __nv_fmind(double a, double b) { return (a < b) ? a : b; }
 double __nv_fmaxd(double a, double b) { return (a > b) ? a : b; }
 int __nvvm_mul24_i(int a, int b) { return a * b; }
+int __nvvm_mulhi_ui(int a, int b) {
+  long long res = (long long)a * (long long)b;
+  return res >> 32;
+}
 double _ZL3expd(double base) { return exp(base); }
 double _ZL8copysigndd(double x, double y) { return y > 0 ? abs(x) : -abs(x); };
