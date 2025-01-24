@@ -211,6 +211,9 @@ void llvm_preprocess(llvm::Module *M) {
     }
   }
   Passes.run(*M);
+
+  llvm::raw_ostream &os = llvm::outs();
+  M->print(os, nullptr);
 }
 
 // transform constant expression into sequence of instructions
@@ -300,14 +303,25 @@ void replace_cuda_math_built_in(llvm::Module *M) {
   }
 }
 
+// For these functions with non-return property, such as assert_fail,
+// they may introduce so many exit blocks, which make it hard to do flat-collapsing
+// Thus, we need to remove these property. This will not affect the correctness
+void remove_non_return_property(llvm::Module *M) {
+  for (Module::iterator i = M->begin(), e = M->end(); i != e; ++i) {
+    Function *F = &(*i);
+    if (F->hasFnAttribute(Attribute::NoReturn)) {
+      F->removeFnAttr(Attribute::NoReturn);
+    }
+  }
+}
+
 void init_block(llvm::Module *M, std::ofstream &fout) {
   DEBUG_INFO("init block\n");
+  remove_non_return_property(M);
   // using official llvm preprocess
   llvm_preprocess(M);
   // remove useles Cuda function
   remove_cuda_built_in(M);
-  // replace CUDA math function, like expf
-  replace_cuda_math_built_in(M);
   // replace CUDA math function, like expf
   replace_cuda_math_built_in(M);
 

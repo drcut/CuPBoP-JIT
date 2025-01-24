@@ -463,13 +463,13 @@ void replace_built_in_function(llvm::Module *M) {
             } else if (func_name == "__nv_fast_log2f" ||
                        func_name == "__nv_log2f" ||
                        func_name == "__nv_fast_powf" ||
-                       func_name == "__nv_fast_expf" ||
+                       func_name == "__nv_fast_expf" || func_name == "__nv_tanhf" ||
                        func_name == "__nv_powf" || func_name == "__nv_logf" ||
                        func_name == "__nv_expf" || func_name == "__nv_fabsf" ||
-                       func_name == "__nv_log10f" ||
+                       func_name == "__nv_log10f" || func_name == "__nv_erff" ||
                        func_name == "__nv_fmodf" || func_name == "__nv_sqrt" ||
                        func_name == "__nv_sqrtf" || func_name == "__nv_exp" ||
-                       func_name == "__nv_isnanf" ||
+                       func_name == "__nv_isnanf" || func_name == "__nv_rsqrtf" ||
                        func_name == "__nv_isinff" || func_name == "__nv_powi" ||
                        func_name == "__nv_powif") {
               Call->getCalledFunction()->deleteBody();
@@ -703,7 +703,6 @@ Value *createGEP(IRBuilder<> &B, Value *ptr, ArrayRef<Value *> idxlist) {
   } else if (auto *bitCastInst = dyn_cast<BitCastInst>(ptr)) {
     elementType = bitCastInst->getDestTy();
   } else {
-    ptr->dump();
     errs() << "Unable to determine element type for ptr in createGEP\n";
     return nullptr;
   }

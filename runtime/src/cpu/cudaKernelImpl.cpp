@@ -25,4 +25,18 @@ int __nvvm_mulhi_ui(int a, int b) {
   return res >> 32;
 }
 double _ZL3expd(double base) { return exp(base); }
-double _ZL8copysigndd(double x, double y) { return y > 0 ? abs(x) : -abs(x); };
+double _ZL8copysigndd(double x, double y) { return y > 0 ? abs(x) : -abs(x); }
+float __nv_rsqrtf(float x) { return 1 / sqrt(x); }
+float __nv_erff(float x) {return erff(x);}
+float __nv_tanhf(float x) {return tanhf(x);}
+
+void __assertfail(const char *assertion, const char *file, unsigned int line, const char *function, size_t charsize) {
+    // Log the assertion failure details
+    fprintf(stderr, "Assertion failed: %s\n", assertion);
+    fprintf(stderr, "File: %s\n", file);
+    fprintf(stderr, "Line: %u\n", line);
+    fprintf(stderr, "Function: %s\n", function);
+
+    // Terminate the program
+    abort();
+}
